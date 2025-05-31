@@ -117,23 +117,41 @@ class DroneImageManager:
         if not folder_path.exists():
             return []
             
+        # First try to get images from metadata
         metadata_path = folder_path / "metadata.csv"
-        if not metadata_path.exists():
-            return []
-            
         images = []
-        with open(metadata_path, mode='r', newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                image_path = folder_path / row['filename']
-                if image_path.exists():
+        
+        if metadata_path.exists():
+            with open(metadata_path, mode='r', newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    image_path = folder_path / row['filename']
+                    if image_path.exists():
+                        metadata = DroneImageMetadata(
+                            filename=row['filename'],
+                            latitude=float(row['latitude']),
+                            longitude=float(row['longitude']),
+                            altitude=float(row['altitude']),
+                            yaw=float(row['yaw']),
+                            timestamp=datetime.fromisoformat(row['timestamp'])
+                        )
+                        images.append((image_path, metadata))
+        
+        # If no images found in metadata, look for temp_capture files
+        if not images:
+            print(f"DEBUG: No images found in metadata, looking for temp_capture files")
+            temp_files = sorted(folder_path.glob("temp_capture_*.jpg"))
+            if temp_files:
+                print(f"DEBUG: Found {len(temp_files)} temp_capture files")
+                # Create default metadata for temp files
+                for i, image_path in enumerate(temp_files):
                     metadata = DroneImageMetadata(
-                        filename=row['filename'],
-                        latitude=float(row['latitude']),
-                        longitude=float(row['longitude']),
-                        altitude=float(row['altitude']),
-                        yaw=float(row['yaw']),
-                        timestamp=datetime.fromisoformat(row['timestamp'])
+                        filename=image_path.name,
+                        latitude=0.0,  # Default values
+                        longitude=0.0,
+                        altitude=0.0,
+                        yaw=0.0,
+                        timestamp=datetime.utcnow()  # Current time as default
                     )
                     images.append((image_path, metadata))
                     
